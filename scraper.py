@@ -1,56 +1,76 @@
 from playwright.async_api import async_playwright
-from config import URL, DEFAULT_HEADLESS
+from config import URL, DEFAULT_HEADLESS, SELECTOR_TIMEOUT, PAGE_TIMEOUT
 from models.product import Product
+
+class ScraperError(Exception):
+    """Error base del scraper"""
+    pass
 
 async def scrape_ebay(query: str) -> list[Product]:
     data = []
 
-    async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=DEFAULT_HEADLESS)
-        
-        page = await browser.new_page()
-        await page.goto(URL)
+    try: 
 
-        buscador = page.get_by_placeholder("Buscar artículos")
-        await buscador.fill(query)
-        await buscador.press("Enter")
+        async with async_playwright() as p:
+            browser = await p.chromium.launch(headless=DEFAULT_HEADLESS)
+            page = await browser.new_page()
 
-        await page.wait_for_selector(".srp-results", state="visible")
+            page.set_default_timeout(SELECTOR_TIMEOUT)
+            page.set_default_navigation_timeout(PAGE_TIMEOUT)
 
-        while True:
-            productos = page.locator(".srp-results > li")
-            cant_productos = await productos.count()
+            await page.goto(URL)
 
-            for i in range(cant_productos):
-                product = productos.nth(i)
+            buscador = page.get_by_placeholder("Buscar artículos")
+            await buscador.fill(query)
+            await buscador.press("Enter")
 
-                title_locator = product.locator(".s-card__title span.primary").filter(visible=True).first
-
-                if await title_locator.count() == 0:
-                    continue
-
-                title = await title_locator.text_content()
-
-                price_locator = product.locator(".s-card__price")
-                price = None
-
-                if await price_locator.count() > 0:
-                    price_text = await price_locator.first.text_content()
-                    if price_text:
-                        price = price_text
-
-                data.append(Product(
-                    title=title,
-                    price=price
-                ))
-
-            btn_next = page.locator("a.pagination__next")
-            if await btn_next.count() == 0:
-                break
-
-            await btn_next.click()
             await page.wait_for_selector(".srp-results", state="visible")
 
-        await browser.close()
+            while True:
+                productos = page.locator(".srp-results > li")
+                cant_productos = await productos.count()
+
+                for i in range(cant_productos):
+                    product = productos.nth(i)
+
+                    try:
+                        title_locator = product.locator(".s-card__title span.primary").filter(visible=True).first
+
+                        if await title_locator.count() == 0:
+                            continue
+
+                        title = await title_locator.text_content()
+
+                        price_locator = product.locator(".s-card__price")
+                        price = None
+
+                        if await price_locator.count() > 0:
+                            price_text = await price_locator.first.text_content()
+                            if price_text:
+                                price = price_text
+
+                        data.append(Product(
+                            title=title,
+                            price=price
+                        ))
+
+                    except TimeoutError:
+                        continue
+                    
+                btn_next = page.locator("a.pagination__next")
+                if await btn_next.count() == 0:
+                    break
+
+                await btn_next.click()
+                await page.wait_for_selector(".srp-results", state="visible")
+
+            await browser.close()
+
+    except TimeoutError as e:
+        raise ScraperError("Timeout general al scraper ebay") from e
+
+    except Exception as e:
+        raise ScraperError("Error inesperado en el scraper") from e 
 
     return data
+
