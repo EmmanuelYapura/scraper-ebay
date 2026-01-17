@@ -1,2 +1,5 @@
 URL = "https://www.ebay.com/"
 DEFAULT_HEADLESS = False
+
+PAGE_TIMEOUT = 30_000
+SELECTOR_TIMEOUT = 15_000
