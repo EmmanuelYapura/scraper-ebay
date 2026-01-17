@@ -1,12 +1,16 @@
 from playwright.async_api import async_playwright
 from config import URL, DEFAULT_HEADLESS, SELECTOR_TIMEOUT, PAGE_TIMEOUT
 from models.product import Product
+from logger import setup_logger
+
+logger = setup_logger()
 
 class ScraperError(Exception):
     """Error base del scraper"""
     pass
 
 async def scrape_ebay(query: str) -> list[Product]:
+    logger.info(f"Iniciando scraping en eBay | query='{query}'")
     data = []
 
     try: 
@@ -19,14 +23,19 @@ async def scrape_ebay(query: str) -> list[Product]:
             page.set_default_navigation_timeout(PAGE_TIMEOUT)
 
             await page.goto(URL)
+            logger.info("Pagina principal cargada")
 
             buscador = page.get_by_placeholder("Buscar artículos")
             await buscador.fill(query)
             await buscador.press("Enter")
 
             await page.wait_for_selector(".srp-results", state="visible")
+            logger.info("Resultados visibles, comenzando paginacion")
+
+            page_number = 1
 
             while True:
+                logger.info(f"Scrapeando página {page_number}")
                 productos = page.locator(".srp-results > li")
                 cant_productos = await productos.count()
 
@@ -53,24 +62,32 @@ async def scrape_ebay(query: str) -> list[Product]:
                             title=title,
                             price=price
                         ))
+                        logger.debug("Producto agregado")
 
                     except TimeoutError:
+                        logger.warning("Timeout al procesar un producto")
                         continue
                     
                 btn_next = page.locator("a.pagination__next")
                 if await btn_next.count() == 0:
+                    logger.info("No hay mas paginas")
                     break
 
                 await btn_next.click()
                 await page.wait_for_selector(".srp-results", state="visible")
+                page_number += 1
 
             await browser.close()
+            logger.info("Browser cerrado correctamente")
 
     except TimeoutError as e:
+        logger.error("Timeout general durante el scraping", exc_info=True)
         raise ScraperError("Timeout general al scraper ebay") from e
 
     except Exception as e:
+        logger.error("Error inesperado en el scraper", exc_info=True)
         raise ScraperError("Error inesperado en el scraper") from e 
 
+    logger.info(f"Scraping finalizado | productos obtenidos: {len(data)}")
     return data
 
