@@ -1,7 +1,8 @@
 from playwright.async_api import async_playwright
 from config import URL, DEFAULT_HEADLESS
+from models.product import Product
 
-async def scrape_ebay(query: str) -> list[dict]:
+async def scrape_ebay(query: str) -> list[Product]:
     data = []
 
     async with async_playwright() as p:
@@ -38,10 +39,10 @@ async def scrape_ebay(query: str) -> list[dict]:
                     if price_text:
                         price = price_text
 
-                data.append({
-                    "title": title,
-                    "price": price
-                })
+                data.append(Product(
+                    title=title,
+                    price=price
+                ))
 
             btn_next = page.locator("a.pagination__next")
             if await btn_next.count() == 0:
