@@ -1,6 +1,6 @@
 import asyncio
-from scraper import scrape_ebay, ScraperError
-from storage import crear_json
+from services.scraper import scrape_ebay, ScraperError
+from storage.storage import crear_json
 from logger import setup_logger
 
 logger = setup_logger()
