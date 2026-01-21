@@ -1,18 +1,30 @@
-import asyncio
+from fastapi import FastAPI, HTTPException
 from services.scraper import scrape_ebay, ScraperError
-from storage.storage import crear_json
-from logger import setup_logger
+from models.product import Product
+import asyncio
+import sys
 
-logger = setup_logger()
+if sys.platform.startswith("win"):
+    asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
 
-async def main():
+app = FastAPI(
+    title="Ebay Scraper API",
+    description="API para scrapear productos de eBay",
+    version="1.0.0"
+)
+
+@app.get(
+    "/scrape",
+    response_model=list[Product],
+    summary="Scrapear productos de eBay"
+)
+async def scrape(query: str):
     try:
-        products = await scrape_ebay("ps4 2tb")
-        crear_json(products, "ps4_2tb")
-        logger.info(f"Archivo JSON generado correctamente")
+        products = await scrape_ebay(query)
+        return products
 
     except ScraperError as e:
-        logger.error(f"Fallo el scraping: {e}")
-
-if __name__ == "__main__":
-    asyncio.run(main())
+        raise HTTPException(
+            status_code=500,
+            detail=str(e)
+        )
