@@ -21,7 +21,7 @@ app = FastAPI(
     response_model=list[Product],
     summary="Scrapear productos de eBay"
 )
-async def scrape(query: str = Query(..., min_length=3, description="Texto a buscar en eBay")):
+async def scrape(query: str = Query(..., min_length=3, description="Texto a buscar en eBay"), max_pages: int = Query(3, ge=1, le=5, description="Máximo de páginas a scrapear"), max_results: int = Query(50, ge=1, le=100, description="Máximo de productos a devolver")):
 
 
     if not query.strip():
@@ -31,7 +31,7 @@ async def scrape(query: str = Query(..., min_length=3, description="Texto a busc
     logger.info(f"Request recibido / scrape | query={query}")
     
     try:
-        products = await scrape_ebay(query)
+        products = await scrape_ebay(query, max_pages, max_results)
 
         if not products: 
             logger.info(f"No se encontraron productos | query={query}")

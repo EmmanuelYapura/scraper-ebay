@@ -9,7 +9,7 @@ class ScraperError(Exception):
     """Error base del scraper"""
     pass
 
-async def scrape_ebay(query: str) -> list[Product]:
+async def scrape_ebay(query: str, max_pages: int, max_results: int) -> list[Product]:
     logger.info(f"Iniciando scraping en eBay | query='{query}'")
     data = []
 
@@ -33,14 +33,24 @@ async def scrape_ebay(query: str) -> list[Product]:
             logger.info("Resultados visibles, comenzando paginacion")
 
             page_number = 1
+            stop_scraping = False
 
             while True:
+                if page_number > max_pages:
+                    logger.info("Limite de paginas alcanzado")
+                    break
+
                 logger.info(f"Scrapeando página {page_number}")
                 productos = page.locator(".srp-results > li")
                 cant_productos = await productos.count()
 
                 for i in range(cant_productos):
                     product = productos.nth(i)
+
+                    if len(data) >= max_results:
+                        logger.info("Limite de resultados alcanzado")
+                        stop_scraping = True
+                        break
 
                     try:
                         title_locator = product.locator(".s-card__title span.primary").filter(visible=True).first
@@ -67,6 +77,9 @@ async def scrape_ebay(query: str) -> list[Product]:
                     except TimeoutError:
                         logger.warning("Timeout al procesar un producto")
                         continue
+
+                if stop_scraping:
+                    break
                     
                 btn_next = page.locator("a.pagination__next")
                 if await btn_next.count() == 0:
@@ -90,4 +103,3 @@ async def scrape_ebay(query: str) -> list[Product]:
 
     logger.info(f"Scraping finalizado | productos obtenidos: {len(data)}")
     return data
-
